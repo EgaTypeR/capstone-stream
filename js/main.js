@@ -19,9 +19,7 @@ hangupButton.onclick = hangup;
 
 const iceServers = [
     {
-      urls: "turn:145.223.21.121:53478",
-      username: "capstoneC04",
-      credential: "c04forceai"
+        urls: 'stun:stun.l.google.com:19302' // Use public STUN server
     }
 ];
 
