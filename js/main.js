@@ -9,13 +9,21 @@ const localVideo = document.getElementById('localVideo');
 const remoteVideos = {}; // { peerId: HTMLVideoElement }
 
 let localStream;
-let peers = {}; // { peerId: SimplePeer }
+let peers = {}; // { peerId: RTCPeerConnection }
 let socket;
 let room = 'default_room'; // Anda bisa menggunakan mekanisme lain untuk room
 
 startButton.onclick = start;
 callButton.onclick = call;
 hangupButton.onclick = hangup;
+
+const iceServers = [
+    {
+      urls: "turn:145.223.21.121:53478",
+      username: "capstoneC04",
+      credential: "c04forceai"
+    }
+];
 
 // Fungsi untuk memulai mendapatkan media lokal
 async function start() {
@@ -55,7 +63,7 @@ function connectSocket() {
             initiatePeerConnection(source, false);
         }
         try {
-            await peers[source].signal(signal);
+            await handleSignal(peers[source], signal);
             console.log(`Processed signal from ${source}`);
         } catch (err) {
             console.error('Error processing signal:', err);
@@ -65,7 +73,7 @@ function connectSocket() {
     socket.on('user-disconnected', (peerId) => {
         console.log('Peer disconnected:', peerId);
         if (peers[peerId]) {
-            peers[peerId].destroy();
+            peers[peerId].close(); // Tutup koneksi peer
             delete peers[peerId];
         }
         if (remoteVideos[peerId]) {
@@ -89,7 +97,7 @@ function call() {
 function hangup() {
     console.log('Ending calls');
     for (let peerId in peers) {
-        peers[peerId].destroy(); // Menghentikan koneksi peer
+        peers[peerId].close(); // Menghentikan koneksi peer
         if (remoteVideos[peerId]) {
             remoteVideos[peerId].srcObject = null; // Menghapus stream dari video
             remoteVideos[peerId].parentNode.removeChild(remoteVideos[peerId]); // Menghapus elemen video dari DOM
@@ -107,27 +115,30 @@ function hangup() {
     console.log('All connections have been terminated and video elements removed.');
 }
 
-// Fungsi untuk menginisialisasi RTCPeerConnection dengan Simple-Peer
+// Fungsi untuk menginisialisasi RTCPeerConnection
 function initiatePeerConnection(peerId, initiator) {
     console.log(`Initiating peer connection with ${peerId}, initiator: ${initiator}`);
-    const peer = new SimplePeer({
-        initiator: initiator,
-        trickle: false,
-        stream: localStream
-    });
+    const pc = new RTCPeerConnection({ iceServers });
 
-    peer.on('signal', (data) => {
-        console.log(`Sending signal to ${peerId}`);
-        socket.emit('signal', {
-            target: peerId,
-            signal: data
-        });
-    });
+    // Menambahkan stream lokal ke peer connection
+    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-    peer.on('stream', (stream) => {
+    pc.onicecandidate = (event) => {
+        if (event.candidate) {
+            console.log(`Sending ICE candidate to ${peerId}`);
+            socket.emit('signal', {
+                target: peerId,
+                signal: {
+                    candidate: event.candidate
+                }
+            });
+        }
+    };
+
+    pc.ontrack = (event) => {
         console.log(`Received stream from ${peerId}`);
         if (remoteVideos[peerId]) {
-            remoteVideos[peerId].srcObject = stream;
+            remoteVideos[peerId].srcObject = event.streams[0];
         } else {
             // Jika tidak ada elemen video untuk peer ini, buat dinamis
             const video = document.createElement('video');
@@ -140,26 +151,55 @@ function initiatePeerConnection(peerId, initiator) {
             video.style.border = '2px solid #007bff';
             video.style.borderRadius = '4px';
             document.getElementById('videos').appendChild(video);
-            video.srcObject = stream;
+            video.srcObject = event.streams[0];
             remoteVideos[peerId] = video;
             console.log(`Created video element for ${peerId}`);
         }
-    });
+    };
 
-    peer.on('close', () => {
-        console.log(`Peer connection closed with ${peerId}`);
-        if (remoteVideos[peerId]) {
-            remoteVideos[peerId].srcObject = null;
-            remoteVideos[peerId].parentNode.removeChild(remoteVideos[peerId]);
-            delete remoteVideos[peerId];
-            console.log(`Removed video element for closed peer: ${peerId}`);
+    pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'disconnected') {
+            console.log(`Peer connection closed with ${peerId}`);
+            pc.close();
+            delete peers[peerId];
         }
-        delete peers[peerId];
-    });
+    };
 
-    peer.on('error', (err) => {
-        console.error('Peer error:', err);
-    });
+    peers[peerId] = pc;
 
-    peers[peerId] = peer;
+    // Jika initiator, buat offer
+    if (initiator) {
+        pc.createOffer()
+            .then(offer => pc.setLocalDescription(offer))
+            .then(() => {
+                console.log(`Sending offer to ${peerId}`);
+                socket.emit('signal', {
+                    target: peerId,
+                    signal: {
+                        sdp: pc.localDescription
+                    }
+                });
+            })
+            .catch(err => console.error('Error creating offer:', err));
+    }
+}
+
+// Fungsi untuk menangani signal yang diterima
+async function handleSignal(pc, signal) {
+    if (signal.sdp) {
+        await pc.setRemoteDescription(new RTCSessionDescription(signal));
+        if (signal.type === 'offer') {
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            console.log(`Sending answer to ${signal.target}`);
+            socket.emit('signal', {
+                target: signal.target,
+                signal: {
+                    sdp: pc.localDescription
+                }
+            });
+        }
+    } else if (signal.candidate) {
+        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+    }
 }
