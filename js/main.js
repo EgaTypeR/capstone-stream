@@ -11,7 +11,7 @@ const remoteVideos = {}; // { peerId: HTMLVideoElement }
 let localStream;
 let peers = {}; // { peerId: RTCPeerConnection }
 let socket;
-let room = 'default_room'; // Anda bisa menggunakan mekanisme lain untuk room
+let room = 'default_room'; // You can use another mechanism for room
 
 startButton.onclick = start;
 callButton.onclick = call;
@@ -19,11 +19,16 @@ hangupButton.onclick = hangup;
 
 const iceServers = [
     {
-        urls: 'stun:stun.l.google.com:19302' // Use public STUN server
+        urls: 'turn:145.223.21.121:53478',
+        username: 'capstoneC04',
+        credential: 'c04forceai'
+    },
+    {
+        urls: 'stun:stun.l.google.com:19302'
     }
 ];
 
-// Fungsi untuk memulai mendapatkan media lokal
+// Function to start obtaining local media
 async function start() {
     console.log('Requesting local stream');
     startButton.disabled = true;
@@ -40,7 +45,7 @@ async function start() {
     }
 }
 
-// Fungsi untuk menghubungkan ke server signaling dan join room
+// Connect to the signaling server and join the room
 function connectSocket() {
     socket = io();
 
@@ -60,18 +65,13 @@ function connectSocket() {
         if (!peers[source]) {
             initiatePeerConnection(source, false);
         }
-        try {
-            await handleSignal(peers[source], signal);
-            console.log(`Processed signal from ${source}`);
-        } catch (err) {
-            console.error('Error processing signal:', err);
-        }
+        handleSignal(source, signal);
     });
 
     socket.on('user-disconnected', (peerId) => {
         console.log('Peer disconnected:', peerId);
         if (peers[peerId]) {
-            peers[peerId].close(); // Tutup koneksi peer
+            peers[peerId].close();
             delete peers[peerId];
         }
         if (remoteVideos[peerId]) {
@@ -83,7 +83,7 @@ function connectSocket() {
     });
 }
 
-// Fungsi untuk memulai panggilan ke semua peers
+// Function to start calling peers
 function call() {
     callButton.disabled = true;
     hangupButton.disabled = false;
@@ -91,15 +91,15 @@ function call() {
     console.log('Connected to socket and ready to call peers.');
 }
 
-// Fungsi untuk mengakhiri semua panggilan
+// Function to end all calls
 function hangup() {
     console.log('Ending calls');
     for (let peerId in peers) {
-        peers[peerId].close(); // Menghentikan koneksi peer
+        peers[peerId].close();
         if (remoteVideos[peerId]) {
-            remoteVideos[peerId].srcObject = null; // Menghapus stream dari video
-            remoteVideos[peerId].parentNode.removeChild(remoteVideos[peerId]); // Menghapus elemen video dari DOM
-            delete remoteVideos[peerId]; // Menghapus referensi dari objek remoteVideos
+            remoteVideos[peerId].srcObject = null;
+            remoteVideos[peerId].parentNode.removeChild(remoteVideos[peerId]);
+            delete remoteVideos[peerId];
             console.log(`Removed video element for peer: ${peerId}`);
         }
     }
@@ -113,32 +113,28 @@ function hangup() {
     console.log('All connections have been terminated and video elements removed.');
 }
 
-// Fungsi untuk menginisialisasi RTCPeerConnection
-function initiatePeerConnection(peerId, initiator) {
-    console.log(`Initiating peer connection with ${peerId}, initiator: ${initiator}`);
+// Function to initiate RTCPeerConnection with Perfect Negotiation
+function initiatePeerConnection(peerId, isPolite) {
+    console.log(`Initiating peer connection with ${peerId}, isPolite: ${isPolite}`);
+
     const pc = new RTCPeerConnection({ iceServers });
 
-    // Menambahkan stream lokal ke peer connection
+    // Perfect negotiation variables
+    let makingOffer = false;
+    let ignoreOffer = false;
+
+    // Attach local stream to connection
     localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
 
-    pc.onicecandidate = (event) => {
-        if (event.candidate) {
-            console.log(`Sending ICE candidate to ${peerId}`);
-            socket.emit('signal', {
-                target: peerId,
-                signal: {
-                    candidate: event.candidate
-                }
-            });
-        }
+    pc.onicecandidate = ({ candidate }) => {
+        socket.emit('signal', { target: peerId, signal: { candidate } });
     };
 
-    pc.ontrack = (event) => {
-        console.log(`Received stream from ${peerId}`);
+    pc.ontrack = ({ streams: [stream] }) => {
         if (remoteVideos[peerId]) {
-            remoteVideos[peerId].srcObject = event.streams[0];
+            remoteVideos[peerId].srcObject = stream;
         } else {
-            // Jika tidak ada elemen video untuk peer ini, buat dinamis
+            // Create dynamic video element if it doesn't exist
             const video = document.createElement('video');
             video.id = `remoteVideo-${peerId}`;
             video.autoplay = true;
@@ -149,55 +145,57 @@ function initiatePeerConnection(peerId, initiator) {
             video.style.border = '2px solid #007bff';
             video.style.borderRadius = '4px';
             document.getElementById('videos').appendChild(video);
-            video.srcObject = event.streams[0];
+            video.srcObject = stream;
             remoteVideos[peerId] = video;
             console.log(`Created video element for ${peerId}`);
         }
     };
 
-    pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'disconnected') {
-            console.log(`Peer connection closed with ${peerId}`);
-            pc.close();
-            delete peers[peerId];
+    pc.onnegotiationneeded = async () => {
+        try {
+            makingOffer = true;
+            await pc.setLocalDescription();
+            socket.emit('signal', { target: peerId, signal: { description: pc.localDescription } });
+        } catch (err) {
+            console.error('Negotiation error:', err);
+        } finally {
+            makingOffer = false;
         }
     };
 
-    peers[peerId] = pc;
+    pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'failed') {
+            pc.restartIce();
+        }
+    };
 
-    // Jika initiator, buat offer
-    if (initiator) {
-        pc.createOffer()
-            .then(offer => pc.setLocalDescription(offer))
-            .then(() => {
-                console.log(`Sending offer to ${peerId}`);
-                socket.emit('signal', {
-                    target: peerId,
-                    signal: {
-                        sdp: pc.localDescription
-                    }
-                });
-            })
-            .catch(err => console.error('Error creating offer:', err));
-    }
+    // Store the peer connection
+    peers[peerId] = { pc, isPolite, ignoreOffer, makingOffer };
 }
 
-// Fungsi untuk menangani signal yang diterima
-async function handleSignal(pc, signal) {
-    if (signal.sdp) {
-        await pc.setRemoteDescription(new RTCSessionDescription(signal));
-        if (signal.type === 'offer') {
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            console.log(`Sending answer to ${signal.target}`);
-            socket.emit('signal', {
-                target: signal.target,
-                signal: {
-                    sdp: pc.localDescription
-                }
-            });
+// Handle signaling messages with Perfect Negotiation pattern
+async function handleSignal(peerId, { candidate, description }) {
+    const peer = peers[peerId];
+    if (!peer) return;
+
+    const { pc, isPolite } = peer;
+
+    try {
+        if (description) {
+            const offerCollision = description.type === 'offer' && (peer.makingOffer || pc.signalingState !== 'stable');
+
+            peer.ignoreOffer = !isPolite && offerCollision;
+            if (peer.ignoreOffer) return;
+
+            await pc.setRemoteDescription(description);
+            if (description.type === 'offer') {
+                await pc.setLocalDescription();
+                socket.emit('signal', { target: peerId, signal: { description: pc.localDescription } });
+            }
+        } else if (candidate) {
+            await pc.addIceCandidate(candidate);
         }
-    } else if (signal.candidate) {
-        await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+    } catch (err) {
+        console.error('Signal handling error:', err);
     }
 }
