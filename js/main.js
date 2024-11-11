@@ -42,6 +42,19 @@ const iceServers = [
       credential: "Jru1a1oh7S6K+ASw",
     },
 ]
+const iceServersCloudFlare = [
+    {
+      urls: [
+        "stun:stun.cloudflare.com:3478",
+        "turn:turn.cloudflare.com:3478?transport=udp",
+        "turn:turn.cloudflare.com:3478?transport=tcp",
+        "turns:turn.cloudflare.com:5349?transport=tcp"]
+    },
+    {
+      username: "g073314db1d45e01784e43d65f0866d9c3584c65d6562e922d5b307e040ebd7c",
+      credential: "fc9d3addc6741fae3da6346c306040a30e9712b7341be41f79ecbc4cefc81724",
+    },
+]
 
 // Function to start obtaining local media
 async function start() {
@@ -132,7 +145,7 @@ function hangup() {
 function initiatePeerConnection(peerId, isPolite) {
     console.log(`Initiating peer connection with ${peerId}, isPolite: ${isPolite}`);
 
-    const pc = new RTCPeerConnection({ iceServers });
+    const pc = new RTCPeerConnection({ iceServersCloudFlare });
 
     // Perfect negotiation variables
     let makingOffer = false;
