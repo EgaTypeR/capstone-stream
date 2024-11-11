@@ -17,7 +17,7 @@ startButton.onclick = start;
 callButton.onclick = call;
 hangupButton.onclick = hangup;
 
-const iceServers =[
+const iceServers = [
     {
       urls: "stun:stun.relay.metered.ca:80",
     },
