@@ -17,16 +17,31 @@ startButton.onclick = start;
 callButton.onclick = call;
 hangupButton.onclick = hangup;
 
-const iceServers = [
+const iceServers =[
     {
-        urls: 'turn:145.223.21.121:53478',
-        username: 'capstoneC04',
-        credential: 'c04forceai'
+      urls: "stun:stun.relay.metered.ca:80",
     },
     {
-        urls: 'stun:stun.l.google.com:19302'
-    }
-];
+      urls: "turn:global.relay.metered.ca:80",
+      username: "3adba8aedbd64dc8b4f1461a",
+      credential: "Jru1a1oh7S6K+ASw",
+    },
+    {
+      urls: "turn:global.relay.metered.ca:80?transport=tcp",
+      username: "3adba8aedbd64dc8b4f1461a",
+      credential: "Jru1a1oh7S6K+ASw",
+    },
+    {
+      urls: "turn:global.relay.metered.ca:443",
+      username: "3adba8aedbd64dc8b4f1461a",
+      credential: "Jru1a1oh7S6K+ASw",
+    },
+    {
+      urls: "turns:global.relay.metered.ca:443?transport=tcp",
+      username: "3adba8aedbd64dc8b4f1461a",
+      credential: "Jru1a1oh7S6K+ASw",
+    },
+]
 
 // Function to start obtaining local media
 async function start() {
