@@ -1,0 +1,71 @@
+<!-- broadcaster.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Broadcaster</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <style>
+      .localVideo{
+        height: 100px;
+      }
+    </style>
+</head>
+<body>
+    <h1>Live Streaming - Broadcaster</h1>
+    <video id="localVideo" autoplay muted playsinline></video>
+    <script>
+        const socket = io("wss://rtc.forceai.tech"); // Signaling server URL
+        const videoElement = document.getElementById("localVideo");
+        let peerConnection;
+
+        const iceServersCloudFlare = [
+            {
+              urls: [
+                "stun:stun.cloudflare.com:3478",
+                "turn:turn.cloudflare.com:3478?transport=udp",
+                "turn:turn.cloudflare.com:3478?transport=tcp",
+                "turns:turn.cloudflare.com:5349?transport=tcp"]
+            },
+            {
+              username: "g073314db1d45e01784e43d65f0866d9c3584c65d6562e922d5b307e040ebd7c",
+              credential: "fc9d3addc6741fae3da6346c306040a30e9712b7341be41f79ecbc4cefc81724",
+            },
+        ]
+
+        async function startStream() {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            videoElement.srcObject = stream;
+
+            peerConnection = new RTCPeerConnection({iceServersCloudFlare});
+            stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+
+            // Send offer to signaling server
+            socket.emit("offer", offer);
+
+            // Receive answer from viewer
+            socket.on("answer", async (answer) => {
+                console.log("Received answer from viewer");
+                await peerConnection.setRemoteDescription(answer);
+            });
+
+            // Handle ICE candidates from viewer
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log("Sending ICE candidate:", event.candidate);
+                    socket.emit("candidate", event.candidate);
+                }
+            };
+
+            socket.on("candidate", async (candidate) => {
+                console.log("Received ICE candidate from viewer");
+                await peerConnection.addIceCandidate(candidate);
+            });
+        }
+
+        startStream();
+    </script>
+</body>
+</html>
