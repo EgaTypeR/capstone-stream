@@ -10,7 +10,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // Serve static files
-app.use(express.static(__dirname));
+app.use(express.static(__dirname + '/'));
 
 // Start the server
 const PORT = process.env.PORT || 3030;
