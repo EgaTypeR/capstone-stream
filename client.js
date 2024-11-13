@@ -1,15 +1,12 @@
 // signaling_server.js
 
+const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 
-// Create a simple HTTP server
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Socket.IO signaling server is running\n');
-});
-
-// Initialize Socket.IO with the HTTP server
+// Create an Express app and HTTP server
+const app = express();
+const server = http.createServer(app);
 const io = new Server(server);
 
 // Event handler for new connections
@@ -51,7 +48,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// Start the server on port 80
+// Start the server
 const PORT = 8875;
 server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
