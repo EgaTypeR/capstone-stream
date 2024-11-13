@@ -10,8 +10,8 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // Serve static files
-const dir_path = __dirname + '/'
-app.use(express.static(dir_path));
+app.use('/viewer', express.static(path.join(__dirname, 'viewer')));
+app.use('/broadcast', express.static(path.join(__dirname, 'broadcast')));
 
 // Start the server
 const PORT = process.env.PORT || 3030;
