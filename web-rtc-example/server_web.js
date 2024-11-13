@@ -17,5 +17,4 @@ app.use('/broadcast', express.static(path.join(__dirname, 'broadcast')));
 const PORT = process.env.PORT || 3030;
 server.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
-    console.log(dir_path)
 });
