@@ -10,11 +10,12 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // Serve static files
-app.use(express.static(__dirname + '/'));
+path = __dirname + '/'
+app.use(express.static(path));
 
 // Start the server
 const PORT = process.env.PORT || 3030;
 server.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
-    console.log(__dirname)
+    console.log(path)
 });
