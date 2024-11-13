@@ -10,7 +10,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // Serve static files
-path = __dirname + '/'
+const path = __dirname + '/'
 app.use(express.static(path));
 
 // Start the server
