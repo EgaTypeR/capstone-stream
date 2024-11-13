@@ -1,58 +1,34 @@
-// signaling_server.js
+// signaling-server.js
+const { Server } = require("socket.io");
 
-const http = require('http');
-const { Server } = require('socket.io');
-
-// Create a simple HTTP server
-const server = http.createServer((req, res) => {
-    res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Socket.IO signaling server is running\n');
+const io = new Server(1145, {
+    cors: {
+        origin: "*",
+    }
 });
 
-// Initialize Socket.IO with the HTTP server
-const io = new Server(server);
+io.on("connection", (socket) => {
+    console.log("Client connected:", socket.id);
 
-// Event handler for new connections
-io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
-
-    // Handle disconnect event
-    socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
-        // Notify other clients if needed
-        io.emit('user-disconnected', socket.id);
+    // Handle offer from broadcaster
+    socket.on("offer", (data) => {
+        socket.broadcast.emit("offer", data);
     });
 
-    // Handle joining a room
-    socket.on('join', (room) => {
-        socket.join(room);
-        console.log(`User ${socket.id} joined room ${room}`);
-        // Notify other clients in the room about the new peer
-        socket.to(room).emit('new-peer', socket.id);
+    // Handle answer from viewer
+    socket.on("answer", (data) => {
+        socket.broadcast.emit("answer", data);
     });
 
-    // Handle signaling messages
-    socket.on('signal', (data) => {
-        const { target, signal } = data;
-        console.log(`Received signal from ${socket.id}, targeting ${target}`);
+    // Handle ICE candidates
+    socket.on("candidate", (data) => {
+        socket.broadcast.emit("candidate", data);
+    });
 
-        if (target === 'broadcast') {
-            // Send to all clients in the same room except the sender
-            const rooms = Array.from(socket.rooms);
-            rooms.forEach(room => {
-                if (room !== socket.id) {
-                    socket.to(room).emit('signal', { source: socket.id, signal });
-                }
-            });
-        } else {
-            // Send directly to the specific target
-            io.to(target).emit('signal', { source: socket.id, signal });
-        }
+    socket.on("disconnect", () => {
+        console.log("Client disconnected:", socket.id);
     });
 });
 
-// Start the server on port 80
-const PORT = 8875;
-server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+console.log("Signaling server running on ws://localhost:1145");
+

@@ -10,7 +10,8 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 // Serve static files
-app.use(express.static(path.join(__dirname, '/')));
+app.use(express.static(path.join(__dirname+'index.html', '/ingest')));
+app.use(express.static(path.join(__dirname + 'consumer.html', '/consumer')));
 
 // Handle Socket.IO connections
 io.on('connection', (socket) => {

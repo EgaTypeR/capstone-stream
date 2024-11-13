@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Multiple Peer Connections</title>
+    <link rel="stylesheet" href="css/main.css">
+    
+</head>
+<body>
+    <div id="container">
+        <h1>Multiple Peer Connections</h1>
+
+        <div id="videos">
+            <video id="localVideo" playsinline autoplay muted></video>
+            <!-- <video id="remoteVideo1" playsinline autoplay></video> -->
+            <!-- <video id="remoteVideo2" playsinline autoplay></video> -->
+            <!-- Tambahkan lebih banyak elemen video jika diperlukan -->
+        </div>
+
+        <div>
+            <button id="callButton">Call</button>
+            <button id="hangupButton" disabled>Hang Up</button>
+        </div>
+
+        <p>View the console to see logging and to inspect the <code>MediaStream</code> object <code>localStream</code>.</p>
+    </div>
+
+    <!-- Simple-Peer Library -->
+    <script src="https://cdn.jsdelivr.net/npm/simple-peer@9.11.1/simplepeer.min.js"></script>
+    <!-- Socket.IO client -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- Skrip utama -->
+    <script src="js/main.js"></script>
+</body>
+</html>

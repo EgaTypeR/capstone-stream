@@ -1,55 +1,26 @@
-// signaling_server.js
+// socketio_client.js
+const io = require("socket.io-client");
 
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
+// Connect to the Socket.IO server
+const socket = io("wss://rtc.forceai.tech");
 
-// Create an Express app and HTTP server
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+// Event handler for connection
+socket.on("connect", () => {
+    console.log("Connected to server with ID:", socket.id);
 
-// Event handler for new connections
-io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+    // Example of joining a room
+    socket.emit("join", "room1");
 
-    // Handle disconnect event
-    socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
-        // Notify other clients if needed
-        io.emit('user-disconnected', socket.id);
-    });
-
-    // Handle joining a room
-    socket.on('join', (room) => {
-        socket.join(room);
-        console.log(`User ${socket.id} joined room ${room}`);
-        // Notify other clients in the room about the new peer
-        socket.to(room).emit('new-peer', socket.id);
-    });
-
-    // Handle signaling messages
-    socket.on('signal', (data) => {
-        const { target, signal } = data;
-        console.log(`Received signal from ${socket.id}, targeting ${target}`);
-
-        if (target === 'broadcast') {
-            // Send to all clients in the same room except the sender
-            const rooms = Array.from(socket.rooms);
-            rooms.forEach(room => {
-                if (room !== socket.id) {
-                    socket.to(room).emit('signal', { source: socket.id, signal });
-                }
-            });
-        } else {
-            // Send directly to the specific target
-            io.to(target).emit('signal', { source: socket.id, signal });
-        }
-    });
+    // Send a test message to the server
+    socket.emit("signal", { target: "broadcast", signal: { message: "Hello from client" } });
 });
 
-// Start the server
-const PORT = 8875;
-server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+// Event handler for receiving messages
+socket.on("signal", (data) => {
+    console.log("Received signal:", data);
+});
+
+// Event handler for disconnect
+socket.on("disconnect", () => {
+    console.log("Disconnected from server");
 });
